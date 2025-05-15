@@ -39,36 +39,59 @@ export async function handleRequest(req: IncomingMessage, res: ServerResponse) {
     return;
   }
 
-if (method === "DELETE" && url === "/users") {
-  try {
-    const result = await db.collection("users").deleteMany({});
-    res.writeHead(200, { "Content-Type": "application/json" });
-    res.end(JSON.stringify({ message: `Deleted ${result.deletedCount} users.` }));
-  } catch {
-    res.writeHead(500, { "Content-Type": "application/json" });
-    res.end(JSON.stringify({ error: "Failed to delete users." }));
-  }
-  return;
-}
-
-
- 
-  if (method === "DELETE" && url.startsWith("/users/")) {
-    const userId = parseInt(url.split("/")[2]);
+  if (method === "DELETE" && url === "/users") {
     try {
-      const result = await db.collection("users").deleteOne({ id: userId });
-      if (result.deletedCount === 0) {
-        res.writeHead(404);
-        res.end(JSON.stringify({ error: "User not found." }));
-      } else {
-        res.writeHead(200);
-        res.end(JSON.stringify({ message: `User ${userId} deleted.` }));
-      }
+      const userResult = await db.collection("users").deleteMany({});
+      const postResult = await db.collection("posts").deleteMany({});
+      const commentResult = await db.collection("comments").deleteMany({});
+
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({
+        message: `Deleted ${userResult.deletedCount} users, ${postResult.deletedCount} posts, and ${commentResult.deletedCount} comments.`
+      }));
     } catch {
-      res.writeHead(500);
-      res.end(JSON.stringify({ error: "Error deleting user." }));
+      res.writeHead(500, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: "Failed to delete users." }));
     }
     return;
+  }
+
+  if (method === "DELETE" && url.startsWith("/users/")) {
+    const parts = url.split("/");
+    if (parts.length === 3) {
+      const userId = parseInt(parts[2]);
+      if (isNaN(userId)) {
+        res.writeHead(400, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ error: "Invalid userId." }));
+        return;
+      }
+
+      try {
+        const userResult = await db.collection("users").deleteOne({ id: userId });
+        if (userResult.deletedCount === 0) {
+          res.writeHead(404, { "Content-Type": "application/json" });
+          res.end(JSON.stringify({ error: "User not found." }));
+          return;
+        }
+
+        const userPosts = await db.collection("posts").find({ userId }).toArray();
+        const postIds = userPosts.map((post: any) => post.id);
+
+        await db.collection("posts").deleteMany({ userId });
+        if (postIds.length > 0) {
+          await db.collection("comments").deleteMany({ postId: { $in: postIds } });
+        }
+
+        res.writeHead(200, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({
+          message: `User ${userId}, their ${userPosts.length} posts and related comments deleted.`
+        }));
+      } catch {
+        res.writeHead(500);
+        res.end(JSON.stringify({ error: "Error deleting user." }));
+      }
+      return;
+    }
   }
 
   if (method === "GET" && url.startsWith("/users/")) {
@@ -112,7 +135,7 @@ if (method === "DELETE" && url === "/users") {
         const user = JSON.parse(body);
         const existing = await db.collection("users").findOne({ id: user.id });
         if (existing) {
-          res.writeHead(409); // Conflict
+          res.writeHead(409);
           res.end(JSON.stringify({ error: "User already exists." }));
           return;
         }
