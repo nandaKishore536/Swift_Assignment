@@ -8,7 +8,6 @@ export async function handleRequest(req: IncomingMessage, res: ServerResponse) {
   const url = req.url || "";
   const db = await connectDB();
 
-  // GET /load
   if (method === "GET" && url === "/load") {
     try {
       const [usersRes, postsRes, commentsRes] = await Promise.all([
@@ -40,7 +39,6 @@ export async function handleRequest(req: IncomingMessage, res: ServerResponse) {
     return;
   }
 
-  // DELETE /users
 if (method === "DELETE" && url === "/users") {
   try {
     const result = await db.collection("users").deleteMany({});
@@ -54,7 +52,7 @@ if (method === "DELETE" && url === "/users") {
 }
 
 
-  // DELETE /users/:userId
+ 
   if (method === "DELETE" && url.startsWith("/users/")) {
     const userId = parseInt(url.split("/")[2]);
     try {
@@ -73,7 +71,6 @@ if (method === "DELETE" && url === "/users") {
     return;
   }
 
-  // GET /users/:userId
   if (method === "GET" && url.startsWith("/users/")) {
     const userId = parseInt(url.split("/")[2]);
     try {
@@ -107,7 +104,6 @@ if (method === "DELETE" && url === "/users") {
     return;
   }
 
-  // PUT /users
   if (method === "PUT" && url === "/users") {
     let body = "";
     req.on("data", chunk => (body += chunk));
@@ -135,7 +131,6 @@ if (method === "DELETE" && url === "/users") {
     return;
   }
 
-  // Fallback
   res.writeHead(404, { "Content-Type": "application/json" });
   res.end(JSON.stringify({ error: "Route not found" }));
 }
